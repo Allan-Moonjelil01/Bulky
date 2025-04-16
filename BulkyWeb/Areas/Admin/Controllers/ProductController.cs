@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using SD7501Bulky.DataAccess.Repository.IRepository;
 using SD7501Bulky.Models;
+using SD7501Bulky.Models.ViewModels;
 using System.Collections.Generic;
 
 namespace BulkyWeb.Areas.Admin.Controllers
@@ -12,10 +13,12 @@ namespace BulkyWeb.Areas.Admin.Controllers
     public class ProductController : Controller
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IWebHostEnvironment _webHostEnvironment;
        
-        public ProductController(IUnitOfWork unitOfWork)
+        public ProductController(IUnitOfWork unitOfWork, IWebHostEnvironment webHostEnvironment)
         {
             _unitOfWork = unitOfWork;
+            _webHostEnvironment = webHostEnvironment;
         }
         public IActionResult Index()
         {
@@ -25,67 +28,153 @@ namespace BulkyWeb.Areas.Admin.Controllers
             return View(objProductList);
         }
 
-        //CREATE BUTTON
-        public IActionResult Create()
+        ////CREATE BUTTON
+        //public IActionResult Create()
+        //{
+        //    //IEnumerable<SelectListItem> CategoryList = _unitOfWork.Category.GetAll().Select(u => new SelectListItem
+        //    //{
+        //    //    Text = u.Name,
+        //    //    Value = u.Id.ToString()
+        //    //});
+        //    //ViewBag.CategoryList = CategoryList;
+        //    //ViewData["CategoryList"]= CategoryList;
+        //    ProductVM productVM = new()
+        //    {
+        //        CategoryList = _unitOfWork.Category.GetAll().Select(u => new SelectListItem
+        //        {
+        //            Text = u.Name,
+        //            Value = u.Id.ToString()
+        //        }),
+        //        Product = new Product()
+        //    };
+        //    return View(productVM);
+        //}
+
+        public IActionResult Upsert(int? id)
         {
-            IEnumerable<SelectListItem> CategoryList = _unitOfWork.Category.GetAll().Select(u => new SelectListItem
+            ProductVM productVM = new()
             {
-                Text = u.Name,
-                Value = u.Id.ToString()
-            });
-            ViewBag.CategoryList = CategoryList;
-            return View();
+                CategoryList = _unitOfWork.Category.GetAll().Select(u => new SelectListItem
+                {
+                    Text = u.Name,
+                    Value = u.Id.ToString()
+                }),
+                Product = new Product()
+            };
+                if (id == null || id == 0)
+            {
+                //create
+                return View(productVM);
+            } else
+            {
+                //update
+                productVM.Product = _unitOfWork.Product.Get(u => u.Id == id);
+                return View(productVM);
+            }
         }
 
         [HttpPost]
-        public IActionResult Create(Product obj)
+        public IActionResult Upsert(ProductVM productVM,IFormFile? file)
         {
-
+            String tempMsg = "";
             if (ModelState.IsValid)
             {
-                _unitOfWork.Product.Add(obj);
+                string wwwRootPath = _webHostEnvironment.WebRootPath;
+                if (file != null)
+                {
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                    string productPath = Path.Combine(wwwRootPath, @"images\product");
+                    using (var filestream = new FileStream(Path.Combine(productPath, fileName), FileMode.Create))
+                    {
+                        file.CopyTo(filestream);
+                    }
+                    productVM.Product.ImageUrl = @"\images\product\" + fileName;
+                }
+                if(productVM.Product.Id == 0)
+                {
+                    _unitOfWork.Product.Add(productVM.Product);
+                    tempMsg = "Product created succesfully";
+                }
+                else
+                {
+                    _unitOfWork.Product.Update(productVM.Product);
+                    tempMsg = "Product updated succesfully";
+                }
+                //_unitOfWork.Product.Add(productVM.Product);
                 _unitOfWork.Save();
-                TempData["success"] = "Product created succesfully";
+                //TempData["success"] = "Product created succesfully";
+                TempData["success"] = tempMsg;
                 return RedirectToAction("Index");
             }
-            return View();
+            else
+            {
+                productVM.CategoryList = _unitOfWork.Category.GetAll().Select(u => new SelectListItem
+                {
+                    Text = u.Name,
+                    Value = u.Id.ToString()
+                });
+                return View(productVM);
+            }
         }
 
-        //EDIT BUTTON
-        public IActionResult Edit(int? id)
-        {
-            if(id == null || id == 0)
-            {
-                return NotFound();
-            }
-            Product? productFromDb = _unitOfWork.Product.Get(u => u.Id == id);
+        //[HttpPost]
+        //public IActionResult Create(ProductVM productVM)
+        //{
 
-            if(productFromDb == null)
-            {
-                return NotFound();
-            }
+        //    if (ModelState.IsValid)
+        //    {
+        //        _unitOfWork.Product.Add(productVM.Product);
+        //        _unitOfWork.Save();
+        //        TempData["success"] = "Product created succesfully";
+        //        return RedirectToAction("Index");
+        //    }
+        //    else
+        //    {
+        //        productVM.CategoryList = _unitOfWork.Category.GetAll().Select(u => new SelectListItem
+        //        {
+        //        Text = u.Name,
+        //        Value = u.Id.ToString()
+        //        });
+        //        return View(productVM);
+        //    }
+                
+        //}
+
+        ////EDIT BUTTON
+        //public IActionResult Edit(int? id)
+        //{
+        //    if(id == null || id == 0)
+        //    {
+        //        return NotFound();
+        //    }
+        //    Product? productFromDb = _unitOfWork.Product.Get(u => u.Id == id);
+
+        //    if(productFromDb == null)
+        //    {
+        //        return NotFound();
+        //    }
 
 
-            //Product? ProductFromDb1 = _db.Categories.FirstOrDefault(u => u.Id == id);
+        //    //Product? ProductFromDb1 = _db.Categories.FirstOrDefault(u => u.Id == id);
 
-            //Product? ProductFromDb2 = _db.Categories.Where(u => u.Id == id).FirstOrDefault();
+        //    //Product? ProductFromDb2 = _db.Categories.Where(u => u.Id == id).FirstOrDefault();
 
-            return View(productFromDb);
-        }
+        //    return View(productFromDb);
+        //}
 
-        [HttpPost]
-        public IActionResult Edit(Product obj)
-        {
-            if (ModelState.IsValid)
-            {
-                _unitOfWork.Product.Update(obj);
-                _unitOfWork.Save();
-                TempData["success"] = "Product updated succesfully";
-                return RedirectToAction("Index");
-            }
-            return View();
+        //[HttpPost]
+        //public IActionResult Edit(Product obj)
+        //{
+        //    if (ModelState.IsValid)
+        //    {
+        //        _unitOfWork.Product.Update(obj);
+        //        _unitOfWork.Save();
+        //        TempData["success"] = "Product updated succesfully";
+        //        return RedirectToAction("Index");
+        //    }
+        //    return View();
 
-        }
+        //}
 
 
         //EDIT BUTTON

@@ -1,4 +1,5 @@
 ﻿using BulkyWeb.Models;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -44,9 +45,14 @@ namespace SD7501Bulky.Models
 
         //Foreign Key
         public int CategoryId { get; set; }
+
+
+        //Navigation Property
         [ForeignKey("CategoryId")]
+        [ValidateNever]
         public Category Category { get; set; }
 
+        [ValidateNever]
         public String ImageUrl { get; set; }
 
 
